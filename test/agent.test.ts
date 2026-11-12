@@ -6,8 +6,11 @@ import type {
 	LlmTurn,
 	ToolCall,
 	ToolResult,
+	ToolSpec,
 } from "../src/agent/llm.ts";
+import { SYSTEM_PROMPT } from "../src/agent/systemPrompt.ts";
 import { defineTool } from "../src/agent/tool.ts";
+import { getDataDisclaimerTool } from "../src/tools/getDataDisclaimer.ts";
 
 const usage = { inputTokens: 10, outputTokens: 5 };
 
@@ -43,28 +46,33 @@ describe("runAgent", () => {
 	});
 
 	it("runs the requested tool, returns its result to the model, then answers", async () => {
-		const { llm, sent } = scriptedLlm([
-			askForTools({ id: "call-1", name: "echo", input: { text: "ping" } }),
-			answer("The tool said ping."),
+		const { llm, sent, started } = scriptedLlm([
+			askForTools({ id: "call-1", name: "get_data_disclaimer", input: {} }),
+			answer("The facts are sample data."),
 		]);
 
-		const result = await runAgent("Echo ping", {
+		const result = await runAgent("Can I trust the data?", {
 			llm,
-			tools: [echo],
+			tools: [getDataDisclaimerTool],
 			maxSteps: 5,
 		});
 
+		const disclaimer =
+			"These climate facts are illustrative sample data defined in code, not measurements. Reference: KB-2026-01.";
+		expect(started).toEqual([
+			{ systemPrompt: SYSTEM_PROMPT, tools: [getDataDisclaimerTool] },
+		]);
 		expect(sent[1]).toEqual([
-			{ toolCallId: "call-1", content: "ping", isError: false },
+			{ toolCallId: "call-1", content: disclaimer, isError: false },
 		]);
 		expect(result).toMatchObject({
 			outcome: "answered",
-			answer: "The tool said ping.",
+			answer: "The facts are sample data.",
 			toolCalls: [
 				{
-					name: "echo",
-					input: { text: "ping" },
-					output: "ping",
+					name: "get_data_disclaimer",
+					input: {},
+					output: disclaimer,
 					isError: false,
 				},
 			],
@@ -225,8 +233,8 @@ function askForTools(...toolCalls: ToolCall[]): LlmTurn {
 	return { text: "", toolCalls, stopReason: "tool_use", usage };
 }
 
-/** Plays back scripted turns and records every message the loop sends to the model. */
 function scriptedLlm(turns: LlmTurn[]) {
+	const started: { systemPrompt: string; tools: ToolSpec[] }[] = [];
 	const sent: (string | ToolResult[])[] = [];
 	const nextTurn = async () => {
 		const turn = turns.shift();
@@ -236,16 +244,19 @@ function scriptedLlm(turns: LlmTurn[]) {
 		return turn;
 	};
 	const llm: LlmClient = {
-		startChat: () => ({
-			sendUserMessage: (text) => {
-				sent.push(text);
-				return nextTurn();
-			},
-			sendToolResults: (results) => {
-				sent.push(results);
-				return nextTurn();
-			},
-		}),
+		startChat: (systemPrompt, tools) => {
+			started.push({ systemPrompt, tools });
+			return {
+				sendUserMessage: (text) => {
+					sent.push(text);
+					return nextTurn();
+				},
+				sendToolResults: (results) => {
+					sent.push(results);
+					return nextTurn();
+				},
+			};
+		},
 	};
-	return { llm, sent };
+	return { llm, sent, started };
 }

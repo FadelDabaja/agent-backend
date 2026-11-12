@@ -40,6 +40,13 @@ With a single knowledge source, a fixed retrieve-then-answer pipeline would be s
 - Rejected: a stateless `complete(messages)` port, which would have to carry provider-specific blocks through neutral types.
 - Revisit when: a second provider is added. Provider neutrality is designed here, not proven.
 
+### Claude through the official SDK, one provider
+
+- Decision: `src/llm/anthropicLlm.ts` calls Claude with the non-streaming `messages.create` of `@anthropic-ai/sdk`. It is the only file that imports the SDK, and no other provider is implemented.
+- Why: a stable, typed API surface. The task asks for an LLM, not for portability; the port keeps a second provider possible without building one.
+- Rejected: the SDK's beta tool runner (above) and frameworks that wrap several providers.
+- Revisit when: answers get long enough to stream, or a second provider is required.
+
 ### Answers come only from the retrieved facts
 
 - Decision: the system prompt (`src/agent/systemPrompt.ts`) makes the model search before any climate answer, answer only from what the search returns and otherwise say it does not know. This is my design decision, not a requirement of the task.
