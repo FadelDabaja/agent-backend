@@ -53,3 +53,30 @@ With a single knowledge source, a fixed retrieve-then-answer pipeline would be s
 - Why: the example facts are common knowledge. Without the rule the model could answer from memory, and the search tool would prove nothing.
 - Rejected: letting the model mix the facts with its own knowledge.
 - Revisit when: the knowledge base should add to the model's knowledge rather than replace it.
+
+### A stand-in embedder inside a real vector store
+
+- Decision: `src/knowledge/hashingEmbedder.ts` turns text into counts of words in 500 hashed buckets. The store around it is real: unit-length vectors, cosine similarity, top-k and a minimum score (`src/knowledge/vectorStore.ts`).
+- Why: a mocked vector database is allowed, and Anthropic has no embeddings endpoint, so real embeddings need a second vendor's key or a local model runtime with its own download.
+- Rejected: a hosted embedding API and a local embedding model, for those costs.
+- Revisit when: questions need synonyms, inflections or other languages. It matches words, not meaning, so it is a stand-in and not semantic search.
+
+## Measured
+
+### Similarity scores behind `MIN_SCORE`
+
+Scores of the six facts for the test queries and the smoke questions as written, from a throwaway script over the real embedder and store. Function words such as "is" and "than" are dropped first, so every fact reads as "warmer" plus two countries.
+
+| Query                                                      | Facts naming a country of the query             | Facts sharing only "warmer"     |
+| ---------------------------------------------------------- | ----------------------------------------------- | ------------------------------- |
+| France Sweden warmer                                       | France and Sweden: 1.00                         | 0.33                            |
+| Is France warmer than Sweden? (and the reverse)            | France and Sweden: 1.00                         | 0.33                            |
+| Which is colder, Finland or Korea?                         | Korea and Finland: 0.67                         | none ("colder" is not "warmer") |
+| Is Korea warmer than Sweden?                               | France and Sweden, Korea and Finland: 0.67 each | 0.33                            |
+| Is France warmer than Sweden, and can I trust that?        | France and Sweden: 0.65                         | 0.22                            |
+| Is Brazil warmer than Japan?                               | none                                            | 0.33                            |
+| capital of Japan; Är det varmare i Frankrike än i Sverige? | none                                            | none                            |
+
+`MIN_SCORE = 0.5` keeps every fact that names a country of the query and drops every fact that shares only the template word. The margin shrinks as queries get longer, which is why the tool asks the model for country names plus one keyword.
+
+Bucket count: at 512 buckets "warmer" shares a bucket with "cold", "norway" with "hotter" and "egypt" with "of"; powers of two use only the low bits of the hash. At 500 buckets none of the 13 words in the facts shares a bucket with another or with 67 other words: every word of the smoke questions, other countries and words about temperature.
