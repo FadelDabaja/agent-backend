@@ -61,6 +61,27 @@ With a single knowledge source, a fixed retrieve-then-answer pipeline would be s
 - Rejected: a hosted embedding API and a local embedding model, for those costs.
 - Revisit when: questions need synonyms, inflections or other languages. It matches words, not meaning, so it is a stand-in and not semantic search.
 
+### `GET /ask` and Swagger UI
+
+- Decision: one route, `GET /ask?question=...`, which works from the address bar, plus Swagger UI at `/docs`; `/` redirects there. The agent is exposed, not the tools.
+- Why: both are the simple forms the task names.
+- Rejected: `POST /ask`, the production shape for a paid call that must not be repeated or cached (see [SHORTCUTS.md](SHORTCUTS.md)).
+- Revisit when: anything other than a developer calls it.
+
+### HTTP 200 for every agent outcome
+
+- Decision: `answered`, `refused`, `truncated` and `step_limit` all return 200 with `outcome` set. 400 means a bad question, 502 a failed model call.
+- Why: the status describes the service and `outcome` describes the run. A refusal is the service working.
+- Rejected: mapping outcomes to error status codes.
+- Revisit when: clients need to branch on the outcome without reading the body.
+
+### Fastify with zod schemas
+
+- Decision: Fastify with `fastify-type-provider-zod`, `@fastify/swagger` and `@fastify/swagger-ui` in `src/http/app.ts`.
+- Why: one zod schema validates the query, types the handler and produces the OpenAPI document.
+- Rejected: Express with hand-written validation and a separately maintained OpenAPI file.
+- Revisit when: the team's services standardise on another framework.
+
 ## Measured
 
 ### Similarity scores behind `MIN_SCORE`
