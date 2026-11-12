@@ -9,4 +9,5 @@ This is a work-in-progress case. Each entry names a deliberate gap: where it is,
 3. **Single-turn, no streaming.** Each request is one question, and the answer arrives when it is complete. A real assistant needs conversation memory and a streamed answer.
 4. **No authentication, rate limiting or spend limit.** Anyone who can reach the server can spend the API key's budget. Acceptable for a server that listens on localhost. A real deployment needs all three.
 5. **One LLM provider.** Claude is the only model behind the agent. A real system that needs a second provider adds an adapter.
-6. **No build step, container, CI pipeline or infrastructure code.** Nothing here was asked for. A real service needs a pipeline that runs the checks and deploys an artefact.
+6. **Refusals and truncated replies are reported, not retried.** `runAgent` returns them as the outcomes `refused` and `truncated`, without an answer. Acceptable because the caller sees exactly what happened. A real system needs a retry or fallback policy for both.
+7. **No build step, container, CI pipeline or infrastructure code.** Nothing here was asked for. A real service needs a pipeline that runs the checks and deploys an artefact.
