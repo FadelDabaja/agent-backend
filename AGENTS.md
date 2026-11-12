@@ -25,7 +25,7 @@ The rules this code is written under. Follow them when you change it, and run `n
 
 - Handle only what can actually happen, at the one place that can act on it. No `catch` that logs and rethrows.
 - Bad configuration fails at start-up with one readable message.
-- Only `src/config.ts` reads `process.env`. Only `src/llm/anthropicLlm.ts` imports `@anthropic-ai/sdk`.
+- Only `src/config.ts` reads `process.env`. Within `src/`, only `src/llm/anthropicLlm.ts` imports `@anthropic-ai/sdk`.
 
 ## Tests
 

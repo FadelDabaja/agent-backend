@@ -13,20 +13,20 @@ Written before any code.
 ### TypeScript on Node.js
 
 - Decision: TypeScript on Node.js for the server, the tests and the scripts.
-- Why: of the three allowed stacks it is the one I work in most, and one language covers everything.
-- Rejected: C# with ASP.NET Core and Kotlin with Spring Boot, the other allowed stacks.
+- Why: of the three allowed stacks it is my strongest, and one language covers everything.
+- Rejected: C# with ASP.NET Core and Java or Kotlin with Spring Boot, the other allowed stacks.
 - Revisit when: the team that maintains it works in one of those.
 
 ### Small standard tooling, no build step
 
 - Decision: Vitest for tests, Biome for lint and format, strict TypeScript checked with `tsc --noEmit`, sources run with `tsx`.
-- Why: few tools and little configuration. The code uses only erasable TypeScript syntax, so Node's own type stripping could run it too; `tsx` is a convenience.
+- Why: few tools and little configuration. The code uses only erasable TypeScript syntax, so Node's own type stripping runs it too (`node --experimental-strip-types src/server.ts` on Node 22.16); `tsx` is a convenience.
 - Rejected: Jest with ESLint and Prettier (three tools to configure); compiling to JavaScript before running.
 - Revisit when: the service is deployed and needs a build artefact.
 
 ### A hand-written agent loop
 
-- Decision: `runAgent` in `src/agent/agent.ts` calls the model, runs the tools it asks for, returns their results and stops when the model answers or a step limit is reached.
+- Decision: `runAgent` in `src/agent/agent.ts` calls the model, runs the tools it asks for, returns their results and stops when the model stops asking for tools or after five model calls, the step limit set in `src/server.ts`.
 - Why: with two tools the loop is short, and every step of tool calling stays visible in code that is tested without a network.
 - Rejected: the Anthropic SDK's tool runner, which Anthropic's documentation recommends but which is still in beta; agent frameworks, which earn their place with streaming, many tools, approvals or several providers.
 - Revisit when: one of those needs appears.
@@ -42,7 +42,7 @@ With a single knowledge source, a fixed retrieve-then-answer pipeline would be s
 
 ### Claude through the official SDK, one provider
 
-- Decision: `src/llm/anthropicLlm.ts` calls Claude with the non-streaming `messages.create` of `@anthropic-ai/sdk`. It is the only file that imports the SDK, and no other provider is implemented.
+- Decision: `src/llm/anthropicLlm.ts` calls Claude with the non-streaming `messages.create` of `@anthropic-ai/sdk`. It is the only file in `src/` that imports the SDK, and no other provider is implemented.
 - Why: a stable, typed API surface. The task asks for an LLM, not for portability; the port keeps a second provider possible without building one.
 - Rejected: the SDK's beta tool runner (above) and frameworks that wrap several providers.
 - Revisit when: answers get long enough to stream, or a second provider is required.
@@ -132,7 +132,7 @@ Bucket count: at 512 buckets "warmer" shares a bucket with "cold", "norway" with
 
 ## Problems met
 
-- Biome's format check failed on files checked out with CRLF line endings, which Git for Windows produces with `core.autocrlf`. `.gitattributes` keeps every checkout LF.
+- Biome's format check rejects CRLF line endings, and Git for Windows writes them on checkout when `core.autocrlf` is set. `.gitattributes` keeps every checkout LF; a clean clone passes `npm run check`.
 - `@fastify/swagger` left `GET /ask` out of the OpenAPI document: it documents only routes added after it has loaded. `buildApp` awaits its registration, so it is async.
 - At 512 hash buckets, words collided (see Measured); the embedder uses 500.
 - The scaffold commit has no sources, so `tsc` reports no inputs and Vitest finds no tests there. It was committed once lint passed; every later commit passes `npm run check`.
